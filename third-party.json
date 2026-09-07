@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "name": "react",
+      "version": "19.2.8",
+      "license": "MIT",
+      "source": "https://github.com/facebook/react"
+    },
+    {
+      "name": "react-dom",
+      "version": "19.2.8",
+      "license": "MIT",
+      "source": "https://github.com/facebook/react"
+    },
+    {
+      "name": "xlsx",
+      "version": "0.18.5",
+      "license": "Apache-2.0",
+      "source": "https://github.com/SheetJS/sheetjs"
+    },
+    {
+      "name": "date-holidays",
+      "version": "3.36.1",
+      "license": "ISC AND CC-BY-3.0",
+      "source": "https://github.com/commenthol/date-holidays",
+      "attribution": "date-holidays contributors"
+    },
+    {
+      "name": "@zip.js/zip.js",
+      "version": "2.11.4",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/gildas-lormeau/zip.js"
+    }
+  ]
+}
