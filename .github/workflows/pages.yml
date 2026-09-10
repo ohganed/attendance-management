@@ -19,6 +19,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Add v2-compatible enhancements to published page
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          html = p.read_text(encoding='utf-8')
+          tag = '<script src="attendance-enhancements.js"></script>'
+          if tag not in html:
+              if '</body>' not in html:
+                  raise SystemExit('index.html has no </body>')
+              html = html.replace('</body>', tag + '</body>', 1)
+              p.write_text(html, encoding='utf-8')
+          PY
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
