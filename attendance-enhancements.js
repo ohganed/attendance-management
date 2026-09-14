@@ -1,9 +1,9 @@
 (()=>{
 'use strict';
-const DB='attendance-v02',STORE='state',KEY='main';
+const DB='attendance-v02',STORE='state',KEY='main',SECRETS='secrets';
 const uid=()=>globalThis.crypto?.randomUUID?.()||`rec-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
-function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,2);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,2);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE);if(!db.objectStoreNames.contains(SECRETS))db.createObjectStore(SECRETS)};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 async function readState(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(KEY);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);tx.oncomplete=()=>db.close()})}
 async function updateState(mutator){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE),req=store.get(KEY);req.onsuccess=()=>{const state=req.result;if(!state){reject(new Error('既存データが見つかりません'));return}mutator(state);store.put(state,KEY)};req.onerror=()=>reject(req.error);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
 function classInfo(state,title=''){const classes=Array.isArray(state?.classes)?state.classes:[];return classes.find(c=>title.includes(c.name||''))||null}
