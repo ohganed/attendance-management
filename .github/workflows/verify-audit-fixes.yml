@@ -24,8 +24,8 @@ jobs:
           checks = {
               'recovery-key overwrite warning': '古いバックアップの復元には現在のキーが必要です' in html,
               'restore waits for durable write': 'let a=sw(i);await uw(a),t(a),alert(`バックアップを復元しました`)' in html,
-              'student summary uses student map': 'c(`Student Summary`,Array.from(a.values()))' in html,
-              'monthly summary uses monthly map': 'c(`Monthly Summary`,Array.from(o.values()))' in html,
+              'student summary independently aggregates students': 's(`Student Summary`,(()=>{let e=new Map;' in html,
+              'monthly summary keeps month-keyed map': 's(`Monthly Summary`,Array.from(a.values()))' in html,
           }
           failed = [name for name, ok in checks.items() if not ok]
           for name, ok in checks.items():
