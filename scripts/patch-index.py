@@ -2,47 +2,32 @@
 from __future__ import annotations
 
 import argparse
-import re
 from pathlib import Path
 
 
-def replace_once(text: str, pattern: str, replacement: str, label: str) -> str:
-    updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    count = text.count(old)
     if count != 1:
         raise SystemExit(f"{label}: expected exactly one match, found {count}")
-    return updated
+    return text.replace(old, new, 1)
 
 
 def patch_index(text: str) -> str:
-    # 1) Do not silently replace an existing recovery key. If the imported key is
-    # different, warn that older backups still depend on the old key and require
-    # explicit confirmation before overwriting it.
-    text = replace_once(
-        text,
-        r"onChange:async e=>\{let t=e\.target\.files\?\.\[0\];if\(t\)try\{await fw\(Tw\(await t\.text\(\)\)\),alert\(`復元キーをこの端末に登録しました`\)\}catch\{alert\(`正しい復元キーファイルを選んでください`\)\}finally\{e\.target\.value=``\}\}\}\)\]\}\),\(0,Q\.jsxs\)\(`label`,\{className:`file`,children:\[`暗号化バックアップを復元`",
-        "onChange:async e=>{let t=e.target.files?.[0];if(t)try{let n=Tw(await t.text()),r=await dw();if(r&&!(r.length===n.length&&r.every((e,t)=>e===n[t]))&&!confirm(`現在の復元キーを置き換えます。古いバックアップの復元には現在のキーが必要です。現在の復元キーを別の場所に保存済みの場合だけ続行してください。置き換えますか？`))return;await fw(n),alert(`復元キーをこの端末に登録しました`)}catch{alert(`正しい復元キーファイルを選んでください`)}finally{e.target.value=``}}})]}),(0,Q.jsxs)(`label`,{className:`file`,children:[`暗号化バックアップを復元`",
-        "recovery-key overwrite guard",
-    )
+    # 1) Guard against silently replacing the recovery key that protects old backups.
+    old_key_handler = "onChange:async e=>{let t=e.target.files?.[0];if(t)try{await fw(Tw(await t.text())),alert(`復元キーをこの端末に登録しました`)}catch{alert(`正しい復元キーファイルを選んでください`)}finally{e.target.value=``}}}"
+    new_key_handler = "onChange:async e=>{let t=e.target.files?.[0];if(t)try{let n=Tw(await t.text()),r=await dw();if(r&&!(r.length===n.length&&r.every((e,t)=>e===n[t]))&&!confirm(`現在の復元キーを置き換えます。古いバックアップの復元には現在のキーが必要です。現在の復元キーを別の場所に保存済みの場合だけ続行してください。置き換えますか？`))return;await fw(n),alert(`復元キーをこの端末に登録しました`)}catch{alert(`正しい復元キーファイルを選んでください`)}finally{e.target.value=``}}}"
+    text = replace_once(text, old_key_handler, new_key_handler, "recovery-key overwrite guard")
 
-    # 2) Persist the restored state to IndexedDB before reporting success. React's
-    # state update still runs afterwards, but the success message now means the
-    # durable write has completed.
-    text = replace_once(
-        text,
-        r"else throw Error\(`暗号化されていないファイルです`\);t\(sw\(i\)\),alert\(`バックアップを復元しました`\)",
-        "else throw Error(`暗号化されていないファイルです`);let a=sw(i);await uw(a),t(a),alert(`バックアップを復元しました`)",
-        "restore persistence",
-    )
+    # 2) Persist restored state before the UI reports success.
+    old_restore = "else throw Error(`暗号化されていないファイルです`);t(sw(i)),alert(`バックアップを復元しました`)"
+    new_restore = "else throw Error(`暗号化されていないファイルです`);let a=sw(i);await uw(a),t(a),alert(`バックアップを復元しました`)"
+    text = replace_once(text, old_restore, new_restore, "restore persistence")
 
-    # 3) Student Summary must aggregate across all months, while Monthly Summary
-    # keeps the month dimension. Previously both sheets were generated from the
-    # same month-keyed map.
-    text = replace_once(
-        text,
-        r"let a=new Map;i\.filter\(e=>e\.集計対象===`対象`\)\.forEach\(e=>\{let t=`\$\{e\.学校\}\|\$\{e\.クラス\}\|\$\{e\.出席番号\}\|\$\{String\(e\.日付\)\.slice\(0,7\)\}`,n=a\.get\(t\)\|\|\{学校:e\.学校,クラス:e\.クラス,出席番号:e\.出席番号,月:String\(e\.日付\)\.slice\(0,7\),欠席:0,遅刻:0,早退:0,認欠:0,忌引:0\};n\[e\.区分\]=\(n\[e\.区分\]\|\|0\)\+1,a\.set\(t,n\)\}\);let o=Zf\.book_new\(\),s=\(e,t\)=>Zf\.book_append_sheet\(o,Zf\.json_to_sheet\(t\.length\?t:\[\{情報:`記録なし`\}\]\),e\);return s\(`Attendance Register`,i\),s\(`Student Summary`,Array\.from\(a\.values\(\)\)\),s\(`Monthly Summary`,Array\.from\(a\.values\(\)\)\)",
-        "let a=new Map,o=new Map;i.filter(e=>e.集計対象===`対象`).forEach(e=>{let t=`${e.学校}|${e.クラス}|${e.出席番号}`,n=a.get(t)||{学校:e.学校,クラス:e.クラス,出席番号:e.出席番号,欠席:0,遅刻:0,早退:0,認欠:0,忌引:0};n[e.区分]=(n[e.区分]||0)+1,a.set(t,n);let r=`${t}|${String(e.日付).slice(0,7)}`,c=o.get(r)||{学校:e.学校,クラス:e.クラス,出席番号:e.出席番号,月:String(e.日付).slice(0,7),欠席:0,遅刻:0,早退:0,認欠:0,忌引:0};c[e.区分]=(c[e.区分]||0)+1,o.set(r,c)});let s=Zf.book_new(),c=(e,t)=>Zf.book_append_sheet(s,Zf.json_to_sheet(t.length?t:[{情報:`記録なし`}]),e);return c(`Attendance Register`,i),c(`Student Summary`,Array.from(a.values())),c(`Monthly Summary`,Array.from(o.values()))",
-        "Excel summary aggregation",
-    )
+    # 3) Keep Monthly Summary on the existing month-keyed map, but build Student
+    # Summary independently without a month key so one student is one row.
+    old_summary = "s(`Student Summary`,Array.from(a.values())),s(`Monthly Summary`,Array.from(a.values()))"
+    new_summary = "s(`Student Summary`,(()=>{let e=new Map;return i.filter(e=>e.集計対象===`対象`).forEach(t=>{let n=`${t.学校}|${t.クラス}|${t.出席番号}`,r=e.get(n)||{学校:t.学校,クラス:t.クラス,出席番号:t.出席番号,欠席:0,遅刻:0,早退:0,認欠:0,忌引:0};r[t.区分]=(r[t.区分]||0)+1,e.set(n,r)}),Array.from(e.values())})()),s(`Monthly Summary`,Array.from(a.values()))"
+    text = replace_once(text, old_summary, new_summary, "Excel Student Summary aggregation")
 
     return text
 
