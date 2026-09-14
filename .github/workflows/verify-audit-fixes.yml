@@ -1,0 +1,53 @@
+name: Audit Fix Verification
+on:
+  push:
+    branches: [fix/audit-priority-2026-09-14]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify patches match current compiled app
+        run: python scripts/patch-index.py index.html --check
+      - name: Patch a temporary deployment copy
+        run: |
+          cp index.html /tmp/attendance-index.html
+          python scripts/patch-index.py /tmp/attendance-index.html
+      - name: Verify patched behavior markers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('/tmp/attendance-index.html').read_text(encoding='utf-8')
+          checks = {
+              'recovery-key overwrite warning': '古いバックアップの復元には現在のキーが必要です' in html,
+              'restore waits for durable write': 'let a=sw(i);await uw(a),t(a),alert(`バックアップを復元しました`)' in html,
+              'student summary uses student map': 'c(`Student Summary`,Array.from(a.values()))' in html,
+              'monthly summary uses monthly map': 'c(`Monthly Summary`,Array.from(o.values()))' in html,
+          }
+          failed = [name for name, ok in checks.items() if not ok]
+          for name, ok in checks.items():
+              print(('PASS' if ok else 'FAIL') + ': ' + name)
+          if failed:
+              raise SystemExit('Missing patched behavior: ' + ', '.join(failed))
+          PY
+      - name: Syntax-check patched application module
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('/tmp/attendance-index.html').read_text(encoding='utf-8')
+          match = re.search(r'<script type="module" crossorigin>(.*?)</script>', html, re.S)
+          if not match:
+              raise SystemExit('module script not found')
+          Path('/tmp/attendance-app.mjs').write_text(match.group(1), encoding='utf-8')
+          PY
+          node --check /tmp/attendance-app.mjs
+      - name: Syntax-check enhancement and v2 initialization
+        run: |
+          node --check attendance-enhancements.js
+          grep -F "r.onupgradeneeded" attendance-enhancements.js
+          grep -F "createObjectStore(STORE)" attendance-enhancements.js
+          grep -F "createObjectStore(SECRETS)" attendance-enhancements.js
