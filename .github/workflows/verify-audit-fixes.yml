@@ -51,3 +51,7 @@ jobs:
           grep -F "r.onupgradeneeded" attendance-enhancements.js
           grep -F "createObjectStore(STORE)" attendance-enhancements.js
           grep -F "createObjectStore(SECRETS)" attendance-enhancements.js
+      - name: Install transient IndexedDB test dependency
+        run: npm install --no-save --no-package-lock fake-indexeddb@6.2.4
+      - name: Test fresh-browser and v1-to-v2 migration
+        run: node scripts/test-indexeddb-v2.mjs
