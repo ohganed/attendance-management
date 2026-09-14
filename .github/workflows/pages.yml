@@ -19,6 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Apply audited compiled-app safety patches
+        run: python scripts/patch-index.py index.html
       - name: Add v2-compatible enhancements to published page
         run: |
           python - <<'PY'
