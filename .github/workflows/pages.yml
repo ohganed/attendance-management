@@ -19,6 +19,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Move inline app bundle to an external module
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('index.html')
+          html = p.read_text(encoding='utf-8')
+          open_tag = '<script type="module" crossorigin>'
+          external_tag = '<script type="module" crossorigin src="app.bundle.js"></script>'
+
+          if external_tag not in html:
+              start = html.find(open_tag)
+              if start < 0:
+                  raise SystemExit('inline module script not found')
+              code_start = start + len(open_tag)
+              head_end = html.find('</head>', code_start)
+              if head_end < 0:
+                  raise SystemExit('index.html has no </head>')
+              code_end = html.rfind('</script>', code_start, head_end)
+              if code_end < 0:
+                  raise SystemExit('module closing tag not found')
+              bundle = html[code_start:code_end]
+              if not bundle.strip():
+                  raise SystemExit('inline module bundle is empty')
+              Path('app.bundle.js').write_text(bundle, encoding='utf-8')
+              html = html[:start] + external_tag + html[code_end + len('</script>'):]
+              p.write_text(html, encoding='utf-8')
+
+          published = p.read_text(encoding='utf-8')
+          if external_tag not in published or not Path('app.bundle.js').exists():
+              raise SystemExit('external bundle conversion failed')
+          print('PASS: app bundle externalized for GitHub Pages')
+          PY
       - name: Add v2-compatible enhancements to published page
         run: |
           python - <<'PY'
