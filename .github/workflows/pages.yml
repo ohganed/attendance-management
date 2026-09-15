@@ -34,12 +34,12 @@ jobs:
               if start < 0:
                   raise SystemExit('inline module script not found')
               code_start = start + len(open_tag)
-              head_end = html.find('</head>', code_start)
-              if head_end < 0:
-                  raise SystemExit('index.html has no </head>')
-              code_end = html.rfind('</script>', code_start, head_end)
-              if code_end < 0:
+              code_end = html.rfind('</script>')
+              head_end = html.rfind('</head>')
+              if code_end < code_start:
                   raise SystemExit('module closing tag not found')
+              if head_end < code_end:
+                  raise SystemExit('real </head> must follow module closing tag')
               bundle = html[code_start:code_end]
               if not bundle.strip():
                   raise SystemExit('inline module bundle is empty')
@@ -50,6 +50,8 @@ jobs:
           published = p.read_text(encoding='utf-8')
           if external_tag not in published or not Path('app.bundle.js').exists():
               raise SystemExit('external bundle conversion failed')
+          if published.count('<script type="module" crossorigin>'):
+              raise SystemExit('inline module remained after conversion')
           print('PASS: app bundle externalized for GitHub Pages')
           PY
       - name: Add v2-compatible enhancements to published page
@@ -60,9 +62,10 @@ jobs:
           html = p.read_text(encoding='utf-8')
           tag = '<script src="attendance-enhancements.js"></script>'
           if tag not in html:
-              if '</body>' not in html:
+              body_end = html.rfind('</body>')
+              if body_end < 0:
                   raise SystemExit('index.html has no </body>')
-              html = html.replace('</body>', tag + '</body>', 1)
+              html = html[:body_end] + tag + html[body_end:]
               p.write_text(html, encoding='utf-8')
           PY
       - uses: actions/upload-pages-artifact@v3
