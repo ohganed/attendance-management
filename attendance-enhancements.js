@@ -38,9 +38,59 @@ async function enhanceRows(){let state;try{state=await readState()}catch{return}
   controls.appendChild(wrap);
  })
 }
-async function quickGuidance(){let state;try{state=await readState()}catch(e){alert(e.message);return}const className=prompt('クラス名');if(className===null)return;const cls=(state.classes||[]).find(c=>(c.name||'')===className)||(state.classes||[]).find(c=>(c.name||'').includes(className));const numText=prompt('生徒番号');if(numText===null)return;const studentNumber=Number(numText);if(!Number.isFinite(studentNumber)){alert('生徒番号を数字で入力してください。');return}const scene=prompt('場面（休み時間／昼休み／放課後／その他）','休み時間');if(scene===null)return;await addRecord({classId:cls?.id||null,className:cls?.name||className,schoolId:cls?.schoolId||null,studentNumber,date:today(),scene},'GUIDANCE')}
+
+function classNumbers(cls){
+ const raw=cls?.studentNumbers||cls?.numbers||cls?.attendanceNumbers;
+ let nums=Array.isArray(raw)?raw.map(Number).filter(Number.isFinite):[];
+ if(!nums.length){const n=Number(cls?.studentCount||cls?.count||cls?.maxNumber||0);if(n>0)nums=Array.from({length:n},(_,i)=>i+1)}
+ const removed=new Set((cls?.removedNumbers||cls?.deletedNumbers||cls?.unusedNumbers||[]).map(Number));
+ return [...new Set(nums)].filter(n=>!removed.has(n)).sort((a,b)=>a-b);
+}
+function activeNumber(cls,num,date=today()){
+ const info=(cls?.students||cls?.enrollments||[]).find(x=>Number(x.number??x.studentNumber)===Number(num));
+ if(!info)return true;
+ const start=info.startDate||info.enrolledFrom||info.enrollmentDate;
+ const end=info.endDate||info.enrolledUntil||info.withdrawalDate;
+ return (!start||start<=date)&&(!end||date<=end)&&info.active!==false;
+}
+function choose(title,items,label=x=>String(x)){
+ return new Promise(resolve=>{
+  const overlay=document.createElement('div');overlay.className='am-modal-bg';
+  const box=document.createElement('div');box.className='am-modal';
+  const h=document.createElement('h3');h.textContent=title;box.appendChild(h);
+  items.forEach(item=>{const b=document.createElement('button');b.type='button';b.textContent=label(item);b.onclick=()=>{overlay.remove();resolve(item)};box.appendChild(b)});
+  const cancel=document.createElement('button');cancel.type='button';cancel.textContent='キャンセル';cancel.onclick=()=>{overlay.remove();resolve(null)};box.appendChild(cancel);
+  overlay.appendChild(box);document.body.appendChild(overlay);
+ })
+}
+function lessonContext(state){
+ const sheet=document.querySelector('.sheet'); if(!sheet)return null;
+ const title=sheet.querySelector('.sheet-head h2')?.textContent?.trim()||'';
+ const sub=sheet.querySelector('.sheet-head p')?.textContent?.trim()||'';
+ const cls=classInfo(state,title); if(!cls)return null;
+ const date=(sub.match(/\d{4}-\d{2}-\d{2}/)||[])[0]||today();
+ return {classId:cls.id,className:cls.name,schoolId:cls.schoolId||null,date,lessonLabel:sub,lessonId:[cls.schoolId||'',cls.id,date,sub].join('|')};
+}
+function previousHandoff(state,ctx){
+ const list=(state.lessonHandoffs||[]).filter(x=>x.classId===ctx.classId&&x.date<ctx.date).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+ return list[0]||null;
+}
+async function saveHandoff(ctx,patch){await updateState(s=>{s.lessonHandoffs=Array.isArray(s.lessonHandoffs)?s.lessonHandoffs:[];let r=s.lessonHandoffs.find(x=>x.lessonId===ctx.lessonId);if(!r){r={...ctx,id:uid(),createdAt:new Date().toISOString()};s.lessonHandoffs.push(r)}Object.assign(r,patch,{updatedAt:new Date().toISOString()})})}
+async function addLessonHandoff(){
+ let state;try{state=await readState()}catch{return}
+ const ctx=lessonContext(state);if(!ctx||document.getElementById('am-handoff'))return;
+ const prev=previousHandoff(state,ctx), current=(state.lessonHandoffs||[]).find(x=>x.lessonId===ctx.lessonId)||{};
+ const sheet=document.querySelector('.sheet');const card=document.createElement('section');card.id='am-handoff';card.className='am-handoff';
+ const prevText=prev?.finishedAt||'（前回記録なし）', seed=current.startWith??prev?.nextTime??'';
+ card.innerHTML='<strong>授業引き継ぎ</strong><div class="am-prev">前回終了：'+escapeHtml(prevText)+'</div><label>今日やり始めること<textarea id="am-start"></textarea></label><label>今日終了したところ<textarea id="am-finish"></textarea></label><label>次の時間にやりたいこと<textarea id="am-next"></textarea></label><button type="button" id="am-save-handoff">保存</button>';
+ sheet.insertBefore(card,sheet.firstChild);
+ card.querySelector('#am-start').value=seed;card.querySelector('#am-finish').value=current.finishedAt||'';card.querySelector('#am-next').value=current.nextTime||'';
+ card.querySelector('#am-save-handoff').onclick=async()=>{await saveHandoff(ctx,{startWith:card.querySelector('#am-start').value.trim(),finishedAt:card.querySelector('#am-finish').value.trim(),nextTime:card.querySelector('#am-next').value.trim()});alert('授業引き継ぎを保存しました。')};
+}
+function escapeHtml(v){const d=document.createElement('div');d.textContent=v??'';return d.innerHTML}
+async function quickGuidance(){let state;try{state=await readState()}catch(e){alert(e.message);return}const classes=(state.classes||[]).filter(c=>c&&c.id);if(!classes.length){alert('登録クラスがありません。');return}const cls=await choose('クラスを選択',classes,c=>c.name||c.id);if(!cls)return;const nums=classNumbers(cls).filter(n=>activeNumber(cls,n));if(!nums.length){alert('選択できる出席番号がありません。');return}const studentNumber=await choose('出席番号を選択',nums);if(studentNumber==null)return;const scene=prompt('場面（休み時間／昼休み／放課後／その他）','休み時間');if(scene===null)return;await addRecord({classId:cls.id,className:cls.name||'',schoolId:cls.schoolId||null,studentNumber,date:today(),scene},'GUIDANCE')}
 function addQuickButton(){const header=document.querySelector('header');if(!header||document.getElementById('am-quick-guidance'))return;const b=document.createElement('button');b.id='am-quick-guidance';b.type='button';b.textContent='＋ 指導記録';b.onclick=()=>quickGuidance().catch(e=>alert(e.message));header.appendChild(b)}
-function addStyle(){if(document.getElementById('am-enh-style'))return;const s=document.createElement('style');s.id='am-enh-style';s.textContent=`.am-record-buttons{display:inline-flex;gap:5px;margin-left:6px;flex-wrap:wrap}.am-record-buttons button{font-size:12px;padding:6px 8px}.am-record-buttons .am-follow{color:#9a5a00;border-color:#e0b65b;background:#fff7df}#am-quick-guidance{background:#fff;border:1px solid #cfd5df;border-radius:12px;padding:10px 14px;font-weight:700}`;document.head.appendChild(s)}
-let scheduled=false;function scan(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;addStyle();addQuickButton();enhanceRows()})}
+function addStyle(){if(document.getElementById('am-enh-style'))return;const s=document.createElement('style');s.id='am-enh-style';s.textContent=`.am-modal-bg{position:fixed;inset:0;background:#0008;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}.am-modal{background:#fff;border-radius:16px;padding:16px;max-width:420px;width:100%;max-height:80vh;overflow:auto;display:grid;gap:8px}.am-modal button{min-height:44px}.am-handoff{margin:12px 0;padding:14px;border:1px solid #d7dde7;border-radius:14px;background:#f8fafc;display:grid;gap:10px}.am-handoff label{display:grid;gap:4px;font-weight:700}.am-handoff textarea{min-height:54px;font-size:16px;padding:9px;border:1px solid #cbd5e1;border-radius:10px}.am-prev{padding:8px;background:#fff;border-radius:9px}.am-record-buttons{display:inline-flex;gap:5px;margin-left:6px;flex-wrap:wrap}.am-record-buttons button{font-size:12px;padding:6px 8px}.am-record-buttons .am-follow{color:#9a5a00;border-color:#e0b65b;background:#fff7df}#am-quick-guidance{background:#fff;border:1px solid #cfd5df;border-radius:12px;padding:10px 14px;font-weight:700}`;document.head.appendChild(s)}
+let scheduled=false;function scan(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;addStyle();addQuickButton();enhanceRows();addLessonHandoff()})}
 new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});scan();
 })();
