@@ -134,10 +134,11 @@ function inRange(date,r){return !!r&&date>=r.start&&date<=r.end}
 function calendarRules(state){return Array.isArray(state.calendarRules)?state.calendarRules:[]}
 function exams(state){return Array.isArray(state.exams)?state.exams:[]}
 function subjects(state){return Array.isArray(state.subjects)?state.subjects:[]}
-function blockedRule(state,date){return calendarRules(state).find(r=>inRange(date,r))}
+function blockedRule(state,date,schoolId){return calendarRules(state).find(r=>inRange(date,r)&&(!r.schoolId||r.schoolId===schoolId))}
 globalThis.__attendanceCalendarMerge=(date,state,entries)=>{
- const rules=calendarRules(state),blocked=rules.some(r=>inRange(date,r));
+ const rules=calendarRules(state);
  const kept=entries.filter(entry=>{
+   const blocked=rules.some(r=>inRange(date,r)&&(!r.schoolId||r.schoolId===entry.schoolId));
    if(!blocked||entry.source!=='BASE')return true;
    return (state.lessons||[]).some(l=>l.date===date&&l.period===entry.period&&l.schoolId===entry.schoolId&&l.classId===entry.classId&&l.executionStatus==='COMPLETED');
  });
@@ -156,8 +157,8 @@ async function ensureCalendarState(){
   s.lessons.forEach(l=>{if(!l.lessonType)l.lessonType='regular'});
  });
 }
-function existingRecordsInRange(state,start,end){
- return (state.lessons||[]).filter(l=>l.date>=start&&l.date<=end&&((state.attendance||[]).some(a=>a.lessonId===l.id)||l.executionStatus==='COMPLETED'));
+function existingRecordsInRange(state,start,end,schoolId){
+ return (state.lessons||[]).filter(l=>(!schoolId||l.schoolId===schoolId)&&l.date>=start&&l.date<=end&&((state.attendance||[]).some(a=>a.lessonId===l.id)||l.executionStatus==='COMPLETED'));
 }
 async function addSubject(){
  const state=await readState(),name=prompt('担当科目名（例：化学基礎）','');if(!name?.trim())return;
@@ -168,12 +169,13 @@ async function addSubject(){
  await updateState(s=>{s.subjects=subjects(s);s.subjects.push({id:uid(),name:name.trim(),schoolId:school.id,classIds:picked})});await renderCalendarSettings();
 }
 async function addRule(type){
+ const state=await readState(),school=await choose('設定する学校を選択',state.schools||[],x=>x.name);if(!school)return;
  const name=prompt(CAL_TYPES[type]+'の名称',type==='EXAM_PERIOD'?'中間試験':type==='VACATION'?'夏季休業':'学校行事');if(!name?.trim())return;
  const start=prompt('開始日（YYYY-MM-DD）',today());if(!/^\d{4}-\d{2}-\d{2}$/.test(start||''))return alert('開始日を確認してください。');
  const end=prompt('終了日（YYYY-MM-DD）',start);if(!/^\d{4}-\d{2}-\d{2}$/.test(end||'')||end<start)return alert('終了日を確認してください。');
- const state=await readState(),existing=existingRecordsInRange(state,start,end);
+ const existing=existingRecordsInRange(state,start,end,school.id);
  if(existing.length&&!confirm('この期間には既存の授業・出欠記録が '+existing.length+' 件あります。\n既存記録は削除しません。設定だけ追加します。続けますか？'))return;
- await updateState(s=>{s.calendarRules=calendarRules(s);s.calendarRules.push({id:uid(),type,name:name.trim(),start,end})});await renderCalendarSettings();
+ await updateState(s=>{s.calendarRules=calendarRules(s);s.calendarRules.push({id:uid(),type,name:name.trim(),start,end,schoolId:school.id})});await renderCalendarSettings();
 }
 async function addExam(){
  const state=await readState(),list=subjects(state);if(!list.length)return alert('先に担当科目を登録してください。');
@@ -223,11 +225,12 @@ async function openExamAttendance(lessonId){
  box.querySelector('[data-close]').onclick=()=>overlay.remove();overlay.appendChild(box);document.body.appendChild(overlay);lockInactiveRows(state);enhanceNumberGroups();
 }
 async function renderCalendarSettings(){
- const root=document.getElementById('am-calendar-settings');if(!root)return;const state=await readState(),subs=subjects(state),rules=calendarRules(state),xs=exams(state);
- root.innerHTML='<section class="am-settings-card"><h2>授業日設定</h2><p>試験期間・長期休業・授業なし日を管理します。既存の祝日・休講設定は従来どおり有効です。</p><div class="am-actions"><button data-sub>＋ 担当科目</button><button data-exam>＋ 担当科目の試験</button><button data-ep>＋ 試験期間</button><button data-vac>＋ 長期休業</button><button data-off>＋ 授業なし日・期間</button></div></section>'+
+ const root=document.getElementById('am-calendar-settings');if(!root)return;const state=await readState(),schools=state.schools||[],selected=root.dataset.schoolId&&schools.some(x=>x.id===root.dataset.schoolId)?root.dataset.schoolId:schools[0]?.id,subs=subjects(state).filter(x=>x.schoolId===selected),rules=calendarRules(state).filter(x=>!x.schoolId||x.schoolId===selected),xs=exams(state).filter(x=>x.schoolId===selected);
+ root.innerHTML='<section class="am-settings-card"><h2>授業日設定</h2><label>学校 <select id="am-school-calendar-select">'+schools.map(x=>'<option value="'+escapeHtml(x.id)+'"'+(x.id===selected?' selected':'')+'>'+escapeHtml(x.name)+'</option>').join('')+'</select></label><p>試験期間・長期休業・授業なし日を管理します。既存の祝日・休講設定は従来どおり有効です。</p><div class="am-actions"><button data-sub>＋ 担当科目</button><button data-exam>＋ 担当科目の試験</button><button data-ep>＋ 試験期間</button><button data-vac>＋ 長期休業</button><button data-off>＋ 授業なし日・期間</button></div></section>'+
  '<section class="am-settings-card"><h3>担当科目</h3>'+(subs.length?subs.map(s=>'<div class="am-setting-row"><b>'+escapeHtml(s.name)+'</b><span>'+escapeHtml((s.classIds||[]).map(id=>state.classes?.find(c=>c.id===id)?.name||id).join(' / '))+'</span></div>').join(''):'<p>未登録</p>')+'</section>'+
  '<section class="am-settings-card"><h3>試験</h3>'+(xs.length?xs.map(x=>{const sub=subs.find(s=>s.id===x.subjectId);const ls=(state.lessons||[]).filter(l=>l.examId===x.id);return '<div class="am-setting-row"><div><b>'+escapeHtml(sub?.name||'')+'・'+escapeHtml(x.name)+'</b><small>'+escapeHtml(x.date)+' / '+ls.length+'クラス</small></div><div class="am-row-actions">'+ls.map(l=>'<button data-lesson="'+l.id+'">'+escapeHtml(state.classes?.find(c=>c.id===l.classId)?.name||'クラス')+' 出欠</button>').join('')+'<button class="danger" data-del-exam="'+x.id+'">削除</button></div></div>'}).join(''):'<p>未登録</p>')+'</section>'+
  '<section class="am-settings-card"><h3>通常授業を生成しない期間</h3>'+(rules.length?rules.map(r=>'<div class="am-setting-row"><div><b>'+escapeHtml(CAL_TYPES[r.type]||r.type)+'：'+escapeHtml(r.name)+'</b><small>'+r.start+' 〜 '+r.end+'</small></div><button class="danger" data-del-rule="'+r.id+'">削除</button></div>').join(''):'<p>未登録</p>')+'</section>';
+ root.querySelector('#am-school-calendar-select').onchange=e=>{root.dataset.schoolId=e.target.value;renderCalendarSettings()};
  root.querySelector('[data-sub]').onclick=()=>addSubject();root.querySelector('[data-exam]').onclick=()=>addExam();root.querySelector('[data-ep]').onclick=()=>addRule('EXAM_PERIOD');root.querySelector('[data-vac]').onclick=()=>addRule('VACATION');root.querySelector('[data-off]').onclick=()=>addRule('NO_CLASS');
  root.querySelectorAll('[data-del-rule]').forEach(b=>b.onclick=()=>deleteRule(b.dataset.delRule));root.querySelectorAll('[data-del-exam]').forEach(b=>b.onclick=()=>deleteExam(b.dataset.delExam));root.querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>openExamAttendance(b.dataset.lesson));
 }
