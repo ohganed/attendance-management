@@ -27,7 +27,7 @@ jobs:
           p = Path('index.html')
           html = p.read_text(encoding='utf-8')
           open_tag = '<script type="module" crossorigin>'
-          external_tag = '<script type="module" crossorigin src="app.bundle.js?v=20261020-6"></script>'
+          external_tag = '<script type="module" crossorigin src="app.bundle.js?v=20261020-7"></script>'
 
           if external_tag not in html:
               start = html.find(open_tag)
@@ -64,17 +64,21 @@ jobs:
           html = p.read_text(encoding='utf-8')
           import re
           # Strip any version of the enhancement script, then insert exactly once.
-          html = re.sub(
-              r'<script\\s+src="(?:\\./)?attendance-enhancements\\.js(?:\\?[^"]*)?"\\s*(?:defer)?\\s*></script>',
-              '',
-              html,
-          )
+          start_marker = '<script src="./attendance-enhancements.js'
+          while start_marker in html:
+              start = html.index(start_marker)
+              end = html.find('</script>', start)
+              if end < 0:
+                  raise SystemExit('script closing tag missing')
+              html = html[:start] + html[end + len('</script>'):]
           body_end = html.rfind('</body>')
           if body_end < 0:
               raise SystemExit('index.html has no </body>')
-          html = html[:body_end] + '<script src="./attendance-enhancements.js?v=20261020-5" defer></script>' + html[body_end:]
+          html = html[:body_end] + '<script src="./attendance-enhancements.js?v=20261020-7" defer></script>' + html[body_end:]
           p.write_text(html, encoding='utf-8')
-          assert html.count('attendance-enhancements.js') == 1, 'duplicate enhancement script'
+          # A single matching script tag must remain after publishing.
+          import re
+          assert len(re.findall(r'<script[^>]+src="[^"]*attendance-enhancements\\.js[^>]*>', html)) == 1
           PY
       - uses: actions/upload-pages-artifact@v3
         with:
