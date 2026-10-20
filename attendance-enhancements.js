@@ -169,7 +169,7 @@ async function addSubject(){
  await updateState(s=>{s.subjects=subjects(s);s.subjects.push({id:uid(),name:name.trim(),schoolId:school.id,classIds:picked})});await renderCalendarSettings();
 }
 async function addRule(type){
- const state=await readState(),school=await choose('設定する学校を選択',state.schools||[],x=>x.name);if(!school)return;
+ const state=await readState(),schoolId=document.getElementById('am-school-calendar-select')?.value,school=(state.schools||[]).find(x=>x.id===schoolId);if(!school)return alert('学校を選択してください');
  const name=prompt(CAL_TYPES[type]+'の名称',type==='EXAM_PERIOD'?'中間試験':type==='VACATION'?'夏季休業':'学校行事');if(!name?.trim())return;
  const start=prompt('開始日（YYYY-MM-DD）',today());if(!/^\d{4}-\d{2}-\d{2}$/.test(start||''))return alert('開始日を確認してください。');
  const end=prompt('終了日（YYYY-MM-DD）',start);if(!/^\d{4}-\d{2}-\d{2}$/.test(end||'')||end<start)return alert('終了日を確認してください。');
