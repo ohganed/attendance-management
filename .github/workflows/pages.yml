@@ -76,9 +76,7 @@ jobs:
               raise SystemExit('index.html has no </body>')
           html = html[:body_end] + '<script src="./attendance-enhancements.js?v=20261020-7" defer></script>' + html[body_end:]
           p.write_text(html, encoding='utf-8')
-          # A single matching script tag must remain after publishing.
-          import re
-          assert len(re.findall(r'<script[^>]+src="[^"]*attendance-enhancements\\.js[^>]*>', html)) == 1
+          assert html.count('<script src="./attendance-enhancements.js') == 1, 'expected one enhancement script'
           PY
       - uses: actions/upload-pages-artifact@v3
         with:
