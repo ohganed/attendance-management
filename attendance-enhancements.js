@@ -68,9 +68,9 @@ function showAttendanceDiagnostic(){
  }).catch(e=>alert('診断を取得できません: '+e.message));
 }
 function addDiagnosticButton(){
- if(document.getElementById('am-diagnostic-20261020'))return;
  const nav=document.querySelector('nav');if(!nav)return;
- const b=document.createElement('button');b.id='am-diagnostic-20261020';b.textContent='診断 v4';b.type='button';b.onclick=showAttendanceDiagnostic;nav.appendChild(b);
+ if(!document.getElementById('am-diagnostic-20261020')){const b=document.createElement('button');b.id='am-diagnostic-20261020';b.textContent='診断 v4';b.type='button';b.onclick=showAttendanceDiagnostic;nav.appendChild(b)}
+ document.querySelectorAll('.sheet .sheet-head').forEach(head=>{if(head.querySelector('.am-diagnostic-sheet'))return;const btn=document.createElement('button');btn.type='button';btn.className='am-diagnostic-sheet';btn.textContent='診断 v4';btn.onclick=showAttendanceDiagnostic;head.appendChild(btn)});
 }
 function lockInactiveRows(state){
  document.querySelectorAll('.sheet .students .student, .am-exam-attendance .students .student').forEach(row=>{
