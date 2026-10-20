@@ -27,7 +27,7 @@ jobs:
           p = Path('index.html')
           html = p.read_text(encoding='utf-8')
           open_tag = '<script type="module" crossorigin>'
-          external_tag = '<script type="module" crossorigin src="app.bundle.js?v=20261020-4"></script>'
+          external_tag = '<script type="module" crossorigin src="app.bundle.js?v=20261020-5"></script>'
 
           if external_tag not in html:
               start = html.find(open_tag)
@@ -72,7 +72,7 @@ jobs:
           body_end = html.rfind('</body>')
           if body_end < 0:
               raise SystemExit('index.html has no </body>')
-          html = html[:body_end] + '<script src="./attendance-enhancements.js?v=20261020-3" defer></script>' + html[body_end:]
+          html = html[:body_end] + '<script src="./attendance-enhancements.js?v=20261020-5" defer></script>' + html[body_end:]
           p.write_text(html, encoding='utf-8')
           assert html.count('attendance-enhancements.js') == 1, 'duplicate enhancement script'
           PY
