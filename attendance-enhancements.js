@@ -39,9 +39,9 @@ function enhanceNumberGroups(){
   if(!next||Math.floor((next.num-1)/5)!==band)row.classList.add('am-number-band-end');
  });
 }
-async function enhanceRows(){enhanceNumberGroups();let state;try{state=await readState()}catch{return}const records=Array.isArray(state?.studentRecords)?state.studentRecords:[];
+async function enhanceRows(){enhanceNumberGroups();let state;try{state=await readState()}catch{return}lockInactiveRows(state);const records=Array.isArray(state?.studentRecords)?state.studentRecords:[];
  document.querySelectorAll('.student').forEach(row=>{
-  if(row.dataset.amEnhanced)return;row.dataset.amEnhanced='1';const base=contextFromSheet(state,row);if(base.studentNumber==null)return;
+  if(row.dataset.amEnhanced)return;row.dataset.amEnhanced='1';const base=contextFromSheet(state,row);if(base.studentNumber==null||row.classList.contains('am-inactive-student'))return;
   const controls=row.querySelector('div')||row;const wrap=document.createElement('span');wrap.className='am-record-buttons';
   const learn=document.createElement('button');learn.type='button';learn.textContent='学習';learn.onclick=e=>{e.stopPropagation();addRecord(base,'LEARNING').catch(err=>alert(err.message))};
   const guide=document.createElement('button');guide.type='button';guide.textContent='指導';guide.onclick=e=>{e.stopPropagation();addRecord(base,'GUIDANCE').catch(err=>alert(err.message))};wrap.append(learn,guide);
@@ -51,12 +51,27 @@ async function enhanceRows(){enhanceNumberGroups();let state;try{state=await rea
  })
 }
 
+function canEnterAttendance(state,classId,num,date){
+ const info=(state.enrollments||[]).find(x=>x.classId===classId&&Number(x.studentNumber)===Number(num));
+ return !info?.excluded&&(!info?.startDate||date>=info.startDate)&&(!info?.endDate||date<=info.endDate);
+}
+function lockInactiveRows(state){
+ document.querySelectorAll('.sheet .students .student, .am-exam-attendance .students .student').forEach(row=>{
+  const base=contextFromSheet(state,row);if(!base.classId||base.studentNumber==null)return;
+  const eligible=canEnterAttendance(state,base.classId,base.studentNumber,base.date);
+  row.classList.toggle('am-inactive-student',!eligible);
+  if(!eligible){
+   row.querySelectorAll('button').forEach(b=>{b.disabled=true;b.setAttribute('aria-disabled','true')});
+   if(!row.querySelector('.am-inactive-label')){const label=document.createElement('small');label.className='am-inactive-label';label.textContent='入力対象外';row.appendChild(label)}
+  }
+ });
+}
 function classNumbers(state,cls,date=today()){
  const start=Number(cls?.studentNumberStart),end=Number(cls?.studentNumberEnd);
  if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return [];
  return Array.from({length:end-start+1},(_,i)=>start+i).filter(num=>{
   const info=(state.enrollments||[]).find(x=>x.classId===cls.id&&Number(x.studentNumber)===num);
-  return !info?.excluded&&(!info?.startDate||date>=info.startDate)&&(!info?.endDate||date<=info.endDate);
+  return canEnterAttendance(state,cls.id,num,date);
  });
 }
 function choose(title,items,label=x=>String(x)){
@@ -188,7 +203,7 @@ async function openExamAttendance(lessonId){
   if(rec){const cancel=document.createElement('button');cancel.type='button';cancel.textContent='取消';cancel.disabled=!eligible.has(num);cancel.onclick=async()=>{await updateState(s=>{s.attendance=(s.attendance||[]).filter(a=>a.lessonId!==lesson.id||a.studentNumber!==num)});overlay.remove();openExamAttendance(lesson.id)};controls.appendChild(cancel)}
   list.appendChild(row);
  });
- box.querySelector('[data-close]').onclick=()=>overlay.remove();overlay.appendChild(box);document.body.appendChild(overlay);enhanceNumberGroups();
+ box.querySelector('[data-close]').onclick=()=>overlay.remove();overlay.appendChild(box);document.body.appendChild(overlay);lockInactiveRows(state);enhanceNumberGroups();
 }
 async function renderCalendarSettings(){
  const root=document.getElementById('am-calendar-settings');if(!root)return;const state=await readState(),subs=subjects(state),rules=calendarRules(state),xs=exams(state);
