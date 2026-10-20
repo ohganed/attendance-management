@@ -62,13 +62,15 @@ jobs:
           from pathlib import Path
           p = Path('index.html')
           html = p.read_text(encoding='utf-8')
-          tag = '<script src="attendance-enhancements.js"></script>'
-          if tag not in html:
-              body_end = html.rfind('</body>')
-              if body_end < 0:
-                  raise SystemExit('index.html has no </body>')
-              html = html[:body_end] + tag + html[body_end:]
-              p.write_text(html, encoding='utf-8')
+          import re
+          # Preserve only one enhancement script, including versioned variants.
+          html, count = re.subn(r'<script\\s+src=["\\\'](?:\\./)?attendance-enhancements\\.js(?:\\?[^"\\\']*)?["\\\']\\s*(?:defer)?\\s*></script>', '', html)
+          body_end = html.rfind('</body>')
+          if body_end < 0:
+              raise SystemExit('index.html has no </body>')
+          html = html[:body_end] + '<script src="./attendance-enhancements.js?v=20261020-3" defer></script>\\n' + html[body_end:]
+          p.write_text(html, encoding='utf-8')
+          assert html.count('attendance-enhancements.js') == 1, 'duplicate enhancement script'
           PY
       - uses: actions/upload-pages-artifact@v3
         with:
