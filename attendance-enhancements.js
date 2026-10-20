@@ -59,12 +59,12 @@ function showAttendanceDiagnostic(){
  readState().then(state=>{
   const sheet=document.querySelector('.sheet');const title=sheet?.querySelector('.sheet-head h2')?.textContent?.trim()||'';
   const cls=classInfo(state,title);const subtitle=sheet?.querySelector('.sheet-head p')?.textContent||'';
-  const date=(subtitle.match(/\\d{4}-\\d{2}-\\d{2}/)||[])[0]||today();
+  const date=(subtitle.match(/\d{4}-\d{2}-\d{2}/)||[])[0]||today();
   const lines=['診断版: 20261020-4','画面クラス: '+(title||'未表示'),'照合クラス: '+(cls?.name||'不明'),'授業日: '+date];
   for(const num of [28,31]){const entry=(state.enrollments||[]).find(x=>x.classId===cls?.id&&Number(x.studentNumber)===num);
    lines.push('No.'+num+': '+(entry?.excluded?'未使用':'使用')+' / 終了日: '+(entry?.endDate||'未設定')+' / 入力: '+(cls?(canEnterAttendance(state,cls.id,num,date)?'可能':'不可'):'判定不可'));
   }
-  alert(lines.join('\\n'));
+  alert(lines.join('\n'));
  }).catch(e=>alert('診断を取得できません: '+e.message));
 }
 function addDiagnosticButton(){
