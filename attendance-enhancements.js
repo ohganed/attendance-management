@@ -6,7 +6,7 @@ const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMon
 function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,2);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 async function readState(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(KEY);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);tx.oncomplete=()=>db.close()})}
 async function updateState(mutator){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE),req=store.get(KEY);req.onsuccess=()=>{const state=req.result;if(!state){reject(new Error('既存データが見つかりません'));return}mutator(state);store.put(state,KEY)};req.onerror=()=>reject(req.error);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
-function classInfo(state,title=''){const classes=Array.isArray(state?.classes)?state.classes:[];return classes.find(c=>title.includes(c.name||''))||null}
+function classInfo(state,title=''){const classes=Array.isArray(state?.classes)?state.classes:[];return classes.find(c=>c.name&&c.name===title)||classes.find(c=>c.name&&title.endsWith(c.name))||null}
 function numberFromRow(row){const first=row.firstElementChild?.textContent||row.textContent||'';const m=first.match(/\d+/);return m?Number(m[0]):null}
 function contextFromSheet(state,row){const sheet=row.closest('.sheet');const title=sheet?.querySelector('.sheet-head h2')?.textContent?.trim()||'';const sub=sheet?.querySelector('.sheet-head p')?.textContent?.trim()||'';const cls=classInfo(state,title);return {classId:cls?.id||null,className:cls?.name||title,schoolId:cls?.schoolId||null,studentNumber:numberFromRow(row),lessonLabel:sub,date:(sub.match(/\d{4}-\d{2}-\d{2}/)||[])[0]||today(),scene:'授業中'}}
 async function addRecord(base,type){if(base.studentNumber==null){alert('生徒番号を取得できませんでした。');return}
@@ -54,6 +54,23 @@ async function enhanceRows(){enhanceNumberGroups();let state;try{state=await rea
 function canEnterAttendance(state,classId,num,date){
  const info=(state.enrollments||[]).find(x=>x.classId===classId&&Number(x.studentNumber)===Number(num));
  return !info?.excluded&&(!info?.startDate||date>=info.startDate)&&(!info?.endDate||date<=info.endDate);
+}
+function showAttendanceDiagnostic(){
+ readState().then(state=>{
+  const sheet=document.querySelector('.sheet');const title=sheet?.querySelector('.sheet-head h2')?.textContent?.trim()||'';
+  const cls=classInfo(state,title);const subtitle=sheet?.querySelector('.sheet-head p')?.textContent||'';
+  const date=(subtitle.match(/\\d{4}-\\d{2}-\\d{2}/)||[])[0]||today();
+  const lines=['診断版: 20261020-4','画面クラス: '+(title||'未表示'),'照合クラス: '+(cls?.name||'不明'),'授業日: '+date];
+  for(const num of [28,31]){const entry=(state.enrollments||[]).find(x=>x.classId===cls?.id&&Number(x.studentNumber)===num);
+   lines.push('No.'+num+': '+(entry?.excluded?'未使用':'使用')+' / 終了日: '+(entry?.endDate||'未設定')+' / 入力: '+(cls?(canEnterAttendance(state,cls.id,num,date)?'可能':'不可'):'判定不可'));
+  }
+  alert(lines.join('\\n'));
+ }).catch(e=>alert('診断を取得できません: '+e.message));
+}
+function addDiagnosticButton(){
+ if(document.getElementById('am-diagnostic-20261020'))return;
+ const nav=document.querySelector('nav');if(!nav)return;
+ const b=document.createElement('button');b.id='am-diagnostic-20261020';b.textContent='診断 v4';b.type='button';b.onclick=showAttendanceDiagnostic;nav.appendChild(b);
 }
 function lockInactiveRows(state){
  document.querySelectorAll('.sheet .students .student, .am-exam-attendance .students .student').forEach(row=>{
@@ -221,6 +238,6 @@ function addCalendarSettingsNav(){
 }
 
 function addInactiveStyle(){if(document.getElementById('am-inactive-style'))return;const el=document.createElement('style');el.id='am-inactive-style';el.textContent='.student.am-inactive-student{background:#f2f3f5;color:#8b909a;opacity:.8}.student.am-inactive-student button{cursor:not-allowed;opacity:.45}.student.am-inactive-student small{font-weight:600}';document.head.appendChild(el)}
-let scheduled=false;function scan(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;addStyle();addInactiveStyle();addQuickButton();addCalendarSettingsNav();enhanceRows();addLessonHandoff()})}
+let scheduled=false;function scan(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;addStyle();addInactiveStyle();addDiagnosticButton();addQuickButton();addCalendarSettingsNav();enhanceRows();addLessonHandoff()})}
 ensureCalendarState().catch(console.error);new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});scan();
 })();
