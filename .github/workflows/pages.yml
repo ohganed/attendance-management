@@ -62,13 +62,13 @@ jobs:
           from pathlib import Path
           p = Path('index.html')
           html = p.read_text(encoding='utf-8')
-          # Remove any existing enhancement script before adding the latest one.
-          for previous in (
-              '<script src="./attendance-enhancements.js?v=20261020-2" defer></script>',
-              '<script src="./attendance-enhancements.js" defer></script>',
-              '<script src="attendance-enhancements.js"></script>',
-          ):
-              html = html.replace(previous, '')
+          import re
+          # Strip any version of the enhancement script, then insert exactly once.
+          html = re.sub(
+              r'<script\\s+src="(?:\\./)?attendance-enhancements\\.js(?:\\?[^"]*)?"\\s*(?:defer)?\\s*></script>',
+              '',
+              html,
+          )
           body_end = html.rfind('</body>')
           if body_end < 0:
               raise SystemExit('index.html has no </body>')
