@@ -74,7 +74,7 @@ jobs:
           body_end = html.rfind('</body>')
           if body_end < 0:
               raise SystemExit('index.html has no </body>')
-          html = html[:body_end] + '<script src="./attendance-enhancements.js?v=20261020-7" defer></script>' + html[body_end:]
+          html = html[:body_end] + '<script src="./attendance-enhancements.js?v=20261020-8" defer></script>' + html[body_end:]
           p.write_text(html, encoding='utf-8')
           assert html.count('<script src="./attendance-enhancements.js') == 1, 'expected one enhancement script'
           PY
