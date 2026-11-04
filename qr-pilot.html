@@ -11,15 +11,15 @@ small,.muted{color:#586576}.notice{background:#f5f5eb;padding:10px 12px;border-l
 button{cursor:pointer}button.primary{background:#284a6a;color:white}button:disabled{opacity:.45;cursor:default}
 #camera{display:none;width:100%;max-width:510px;background:#151515;border-radius:8px}#card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px}
 .qr-card{border:1px solid #ccd2d7;border-radius:9px;padding:12px;text-align:center;break-inside:avoid;background:white}
-.qr-card svg{width:135px;max-width:100%;height:auto}#roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:6px}
-.pupil{padding:9px;border:1px solid #d6dadd;border-radius:7px}.pupil.ok{background:#eaf1ef}.pupil.missing{background:#f6f5f1}
+.qr-card svg{width:135px;max-width:100%;height:auto}#roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:6px}
+.pupil{padding:9px;border:1px solid #d6dadd;border-radius:7px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}.pupil.ok{background:#eaf1ef}.pupil.missing{background:#f6f5f1}.small-action{font-size:12px;padding:6px 7px;min-height:34px}
 #message{min-height:25px;font-weight:600}.summary{font-weight:bold;margin:10px 0}footer{margin-top:18px;color:#586576}
 @media print{.no-print,section:not(#cards){display:none!important}body{background:white}main{max-width:100%}#cards{border:0}#card-grid{grid-template-columns:repeat(4,1fr)}.qr-card{page-break-inside:avoid}}
 </style></head><body><main><header class="no-print"><a href="./">← 出欠管理に戻る</a><h1>QR出席確認 <small>試験版</small></h1><p class="notice">この画面は試行用です。出欠簿には書き込みません。端末間の同期はありません。生徒のQRを外部サービスへ送信しません。</p></header>
 <section class="no-print"><h2>1. 対象クラス</h2><div class="controls"><label>学校<select id="school"></select></label><label>クラス<select id="class"></select></label><label>授業日<input id="date" type="date"></label></div>
 <p id="status" class="muted">出席簿データを読み込みます。</p><div class="controls"><button id="generate">このクラスのQRカードを準備</button><button id="cards-print">カードを印刷</button></div><p class="muted">識別コードはランダムに作成され、現在の端末内にだけ保存されます。同じ生徒のカードを再発行しても、既存の番号を変更しません。</p></section>
 <section class="no-print"><h2>2. カメラで読み取る</h2><div class="controls"><button class="primary" id="start">カメラ開始</button><button id="stop" disabled>カメラ停止</button><button id="reset">今回の確認をリセット</button></div><video id="camera" autoplay muted playsinline></video><canvas id="scratch" hidden></canvas><p id="message" aria-live="polite"></p><p class="muted">QRカード忘れは教員が確認してください。未読取は欠席確定ではありません。</p></section>
-<section class="no-print"><h2>3. 確認結果</h2><p id="summary" class="summary">対象クラスを選択してください。</p><div id="roster"></div><div class="controls"><button id="csv">確認結果をCSV保存</button></div></section>
+<section class="no-print"><h2>3. 確認結果</h2><p class="muted">QR忘れは「手動確認」で記録します。誤登録は「取消」で元に戻せます。記録は同じ端末で再度開いても保持されますが、別端末とは同期しません。</p><p id="summary" class="summary">対象クラスを選択してください。</p><div id="roster"></div><div class="controls"><button id="csv">確認結果をCSV保存</button></div></section>
 <section id="cards"><h2>生徒用QRカード</h2><p class="muted no-print">カードは選択したクラスの対象生徒のみ表示します。紛失時は運用を中断し、正式運用では管理者による無効化・再発行を行う設計が必要です。</p><div id="card-grid"></div></section>
-<footer class="no-print"><small>QR試験版 2026-11-04。3,000人・100端末の共有運用には認証と中央データベースが必要です。</small></footer></main>
-<script src="./vendor/qrcode.js"></script><script src="./vendor/jsQR.js"></script><script src="./qr-pilot.js"></script></body></html>
+<footer class="no-print"><small>QR試験版 v2 2026-11-04。3,000人・100端末の共有運用には認証と中央データベースが必要です。</small></footer></main>
+<script src="./vendor/qrcode.js"></script><script src="./vendor/jsQR.js"></script><script src="./qr-pilot.js?v=20261104-2"></script></body></html>
