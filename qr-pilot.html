@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'">
+<title>QR出席確認（試験版）</title>
+<style>
+:root{font-family: -apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#253449;background:#f5f6f7}
+*{box-sizing:border-box}body{margin:0;font-size:16px;line-height:1.6}main{max-width:840px;margin:auto;padding:18px 14px 48px}h1{font-size:24px;margin:8px 0}h2{font-size:19px;margin:4px 0 12px}
+a{color:#315c86}section{background:white;border:1px solid #d9dde3;border-radius:12px;padding:16px;margin:15px 0}
+small,.muted{color:#586576}.notice{background:#f5f5eb;padding:10px 12px;border-left:3px solid #8b8b74;font-size:14px}
+.controls{display:flex;gap:9px;flex-wrap:wrap;align-items:end;margin:12px 0}label{display:block;font-size:14px}select,input,button{font:inherit;border:1px solid #bac3cc;border-radius:8px;padding:10px;background:white;color:#263749}
+button{cursor:pointer}button.primary{background:#284a6a;color:white}button:disabled{opacity:.45;cursor:default}
+#camera{display:none;width:100%;max-width:510px;background:#151515;border-radius:8px}#card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px}
+.qr-card{border:1px solid #ccd2d7;border-radius:9px;padding:12px;text-align:center;break-inside:avoid;background:white}
+.qr-card svg{width:135px;max-width:100%;height:auto}#roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:6px}
+.pupil{padding:9px;border:1px solid #d6dadd;border-radius:7px}.pupil.ok{background:#eaf1ef}.pupil.missing{background:#f6f5f1}
+#message{min-height:25px;font-weight:600}.summary{font-weight:bold;margin:10px 0}footer{margin-top:18px;color:#586576}
+@media print{.no-print,section:not(#cards){display:none!important}body{background:white}main{max-width:100%}#cards{border:0}#card-grid{grid-template-columns:repeat(4,1fr)}.qr-card{page-break-inside:avoid}}
+</style></head><body><main><header class="no-print"><a href="./">← 出欠管理に戻る</a><h1>QR出席確認 <small>試験版</small></h1><p class="notice">この画面は試行用です。出欠簿には書き込みません。端末間の同期はありません。生徒のQRを外部サービスへ送信しません。</p></header>
+<section class="no-print"><h2>1. 対象クラス</h2><div class="controls"><label>学校<select id="school"></select></label><label>クラス<select id="class"></select></label><label>授業日<input id="date" type="date"></label></div>
+<p id="status" class="muted">出席簿データを読み込みます。</p><div class="controls"><button id="generate">このクラスのQRカードを準備</button><button id="cards-print">カードを印刷</button></div><p class="muted">識別コードはランダムに作成され、現在の端末内にだけ保存されます。同じ生徒のカードを再発行しても、既存の番号を変更しません。</p></section>
+<section class="no-print"><h2>2. カメラで読み取る</h2><div class="controls"><button class="primary" id="start">カメラ開始</button><button id="stop" disabled>カメラ停止</button><button id="reset">今回の確認をリセット</button></div><video id="camera" autoplay muted playsinline></video><canvas id="scratch" hidden></canvas><p id="message" aria-live="polite"></p><p class="muted">QRカード忘れは教員が確認してください。未読取は欠席確定ではありません。</p></section>
+<section class="no-print"><h2>3. 確認結果</h2><p id="summary" class="summary">対象クラスを選択してください。</p><div id="roster"></div><div class="controls"><button id="csv">確認結果をCSV保存</button></div></section>
+<section id="cards"><h2>生徒用QRカード</h2><p class="muted no-print">カードは選択したクラスの対象生徒のみ表示します。紛失時は運用を中断し、正式運用では管理者による無効化・再発行を行う設計が必要です。</p><div id="card-grid"></div></section>
+<footer class="no-print"><small>QR試験版 2026-11-04。3,000人・100端末の共有運用には認証と中央データベースが必要です。</small></footer></main>
+<script src="./vendor/qrcode.js"></script><script src="./vendor/jsQR.js"></script><script src="./qr-pilot.js"></script></body></html>
