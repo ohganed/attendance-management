@@ -1,0 +1,28 @@
+// Standalone regression checks for the local-only QR pilot.
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync('qr-pilot.js','utf8');
+const marker="init();\n})();";
+assert(source.includes(marker));
+const instrumented=source.replace(marker,`globalThis.__qrTest={setState(s){state=s},eligible,numbers,changeScope,verifyManual,undo,readQR,tokenKey,persistentKey,restoreSession,get qr(){return [...scanned]},get manual(){return [...manual]}};\n})();`);
+const makeStore=()=>{const m=new Map();return {getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)}};
+const ui=new Map();
+const element=id=>{if(!ui.has(id))ui.set(id,{value:'',textContent:'',replaceChildren(){this.children=[]},append(x){(this.children||=[]).push(x)},style:{}});return ui.get(id)};
+const context={document:{getElementById:element,createElement:tag=>({tag,className:'',textContent:'',disabled:false,append(...items){this.items=items}})},localStorage:makeStore(),sessionStorage:makeStore(),console,crypto:require('node:crypto').webcrypto,Date,confirm:()=>true};
+vm.createContext(context);
+vm.runInContext(instrumented,context,{filename:'qr-pilot.js'});
+const t=context.__qrTest;
+const state={schools:[{id:'a',name:'学校A'},{id:'b',name:'学校B'}],classes:[{id:'a1',schoolId:'a',name:'1-1',studentNumberStart:1,studentNumberEnd:4},{id:'b1',schoolId:'b',name:'1-1',studentNumberStart:1,studentNumberEnd:3}],enrollments:[{classId:'a1',studentNumber:2,endDate:'2026-10-15'},{classId:'a1',studentNumber:3,excluded:true}],attendance:[{lessonId:'older',studentNumber:2,status:'ABSENT'}]};
+t.setState(state);element('school').value='a';element('class').value='a1';element('date').value='2026-10-20';
+assert.equal(t.eligible(1),true);assert.equal(t.eligible(2),false);assert.equal(t.eligible(3),false);assert.equal(t.eligible(4),true);
+t.changeScope();t.verifyManual(1);assert.deepEqual(t.manual,[1]);assert.deepEqual(JSON.parse(context.localStorage.getItem(t.persistentKey())).manual,[1]);
+t.changeScope();assert.deepEqual(t.manual,[1],'confirmation persists beyond a session');
+t.undo(1);assert.deepEqual(t.manual,[]);
+context.localStorage.setItem(t.tokenKey(),JSON.stringify({4:'ATTQR1-TEST'}));
+t.readQR('ATTQR1-TEST');t.readQR('ATTQR1-TEST');assert.deepEqual(t.qr,[4],'duplicate scans are ignored');
+t.changeScope();assert.deepEqual(t.qr,[4],'QR confirmation persists on reload');
+element('date').value='2026-10-14';t.changeScope();assert.equal(t.eligible(2),true,'historical date remains eligible');assert.deepEqual(t.qr,[],'separate date is independent');
+element('school').value='b';element('class').value='b1';t.changeScope();assert.deepEqual(Array.from(t.numbers()),[1,2,3],'other school is not affected');
+assert.equal(state.attendance[0].status,'ABSENT','existing attendance is never mutated');
+console.log('QR pilot regression tests passed');

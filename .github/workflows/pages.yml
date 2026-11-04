@@ -81,6 +81,9 @@ jobs:
       - name: Validate QR pilot JavaScript
         run: |
           node --check qr-pilot.js
+          node tests/qr-pilot.test.cjs
+          node --check vendor/qrcode.js
+          node --check vendor/jsQR.js
           test -s vendor/qrcode.js
           test -s vendor/jsQR.js
           test -s vendor/LICENSE-qrcode.txt
