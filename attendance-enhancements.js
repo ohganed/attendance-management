@@ -234,6 +234,10 @@ async function renderCalendarSettings(){
  root.querySelector('[data-sub]').onclick=()=>addSubject();root.querySelector('[data-exam]').onclick=()=>addExam();root.querySelector('[data-ep]').onclick=()=>addRule('EXAM_PERIOD');root.querySelector('[data-vac]').onclick=()=>addRule('VACATION');root.querySelector('[data-off]').onclick=()=>addRule('NO_CLASS');
  root.querySelectorAll('[data-del-rule]').forEach(b=>b.onclick=()=>deleteRule(b.dataset.delRule));root.querySelectorAll('[data-del-exam]').forEach(b=>b.onclick=()=>deleteExam(b.dataset.delExam));root.querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>openExamAttendance(b.dataset.lesson));
 }
+function addQrPilotNav(){
+ const nav=document.querySelector('nav');if(!nav||document.getElementById('am-qr-pilot-nav'))return;
+ const b=document.createElement('button');b.id='am-qr-pilot-nav';b.type='button';b.textContent='QR試験';b.onclick=()=>{location.href='./qr-pilot.html'};nav.appendChild(b);
+}
 function addCalendarSettingsNav(){
  const nav=document.querySelector('nav');if(!nav||document.getElementById('am-calendar-settings-nav'))return;
  const b=document.createElement('button');b.id='am-calendar-settings-nav';b.type='button';b.textContent='授業日設定';b.onclick=async()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');const app=document.querySelector('.app');app.querySelectorAll(':scope > main,:scope > section.panel').forEach(x=>x.style.display='none');let root=document.getElementById('am-calendar-settings');if(!root){root=document.createElement('main');root.id='am-calendar-settings';root.className='am-calendar-settings';app.appendChild(root)}root.style.display='block';await renderCalendarSettings()};nav.appendChild(b);
@@ -241,6 +245,6 @@ function addCalendarSettingsNav(){
 }
 
 function addInactiveStyle(){if(document.getElementById('am-inactive-style'))return;const el=document.createElement('style');el.id='am-inactive-style';el.textContent='.student.am-inactive-student{background:#f2f3f5;color:#8b909a;opacity:.8}.student.am-inactive-student button{cursor:not-allowed;opacity:.45}.student.am-inactive-student small{font-weight:600}';document.head.appendChild(el)}
-let scheduled=false;function scan(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;addStyle();addInactiveStyle();addDiagnosticButton();addQuickButton();addCalendarSettingsNav();enhanceRows();addLessonHandoff()})}
+let scheduled=false;function scan(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;addStyle();addInactiveStyle();addDiagnosticButton();addQuickButton();addCalendarSettingsNav();addQrPilotNav();enhanceRows();addLessonHandoff()})}
 ensureCalendarState().catch(console.error);new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});scan();
 })();
