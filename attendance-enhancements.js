@@ -114,14 +114,9 @@ function previousHandoff(state,ctx){
  return list[0]||null;
 }
 function handoffSeed(state,ctx,prev,current){
- // Existing entries always belong to their own date. Never replace them with a previous day's plan.
- if(current&&Object.prototype.hasOwnProperty.call(current,'startWith'))return {text:current.startWith||'',carried:false};
- if(!prev?.nextTime)return {text:'',carried:false};
- const nextDay=new Date(`${prev.date}T12:00:00`);nextDay.setDate(nextDay.getDate()+1);
- const following=`${nextDay.getFullYear()}-${String(nextDay.getMonth()+1).padStart(2,'0')}-${String(nextDay.getDate()).padStart(2,'0')}`;
- // A break between the two lesson dates (including school holidays, examinations,
- // ordinary days without this class, and cancelled lessons) preserves the pending plan.
- return following<ctx.date?{text:prev.nextTime,carried:true}:{text:'',carried:false};
+ // Only this lesson's saved entry may prefill the current lesson.
+ // Previous plans are reference information, never automatic input.
+ return {text:current&&Object.prototype.hasOwnProperty.call(current,'startWith')?(current.startWith||''):'',carried:false};
 }
 async function saveHandoff(ctx,patch){await updateState(s=>{s.lessonHandoffs=Array.isArray(s.lessonHandoffs)?s.lessonHandoffs:[];let r=s.lessonHandoffs.find(x=>x.lessonId===ctx.lessonId);if(!r){r={...ctx,id:uid(),createdAt:new Date().toISOString()};s.lessonHandoffs.push(r)}Object.assign(r,patch,{updatedAt:new Date().toISOString()})})}
 async function addLessonHandoff(){
@@ -130,9 +125,9 @@ async function addLessonHandoff(){
  const prev=previousHandoff(state,ctx), current=(state.lessonHandoffs||[]).find(x=>x.lessonId===ctx.lessonId)||{};
  const sheet=document.querySelector('.sheet');const card=document.createElement('section');card.id='am-handoff';card.className='am-handoff';
  const prevText=prev?.finishedAt?.trim()||'前回無記入', seed=handoffSeed(state,ctx,prev,current);
- card.innerHTML='<strong>授業引き継ぎ</strong><div class="am-prev">前回終了：'+escapeHtml(prevText)+'</div>'+(prev?.nextTime?'<div class="am-prev">前回の次回予定：'+escapeHtml(prev.nextTime)+'</div>':'')+(seed.carried?'<small class="am-carry-note">授業のない日を挟んだため、前回の次回予定を自動転記しています（未保存）。</small>':'')+'<label>今日やり始めること<textarea id="am-start"></textarea></label><label>今日終了したところ<textarea id="am-finish"></textarea></label><label>次の時間にやりたいこと<textarea id="am-next"></textarea></label><button type="button" id="am-save-handoff">保存</button>';
+ card.innerHTML='<strong>授業引き継ぎ</strong><div class="am-prev">前回終了：'+escapeHtml(prevText)+'</div>'+(prev?.nextTime?'<div class="am-prev">前回の次回予定：'+escapeHtml(prev.nextTime)+'</div>':'')+(prev?.nextTime?'<button type="button" id="am-copy-prev" class="am-copy-prev">前回の次回予定をコピー</button>':'')+'<label>今日やり始めること<textarea id="am-start"></textarea></label><label>今日終了したところ<textarea id="am-finish"></textarea></label><label>次の時間にやりたいこと<textarea id="am-next"></textarea></label><button type="button" id="am-save-handoff">保存</button>';
  sheet.insertBefore(card,sheet.firstChild);
- card.querySelector('#am-start').value=seed.text;card.querySelector('#am-finish').value=current.finishedAt||'';card.querySelector('#am-next').value=current.nextTime||'';
+ card.querySelector('#am-start').value=seed.text;const copyBtn=card.querySelector('#am-copy-prev');if(copyBtn)copyBtn.onclick=()=>{const field=card.querySelector('#am-start');if(field.value.trim()&&!confirm('現在の「今日やり始めること」を前回予定で置き換えますか？'))return;field.value=prev.nextTime||'';field.focus()};card.querySelector('#am-finish').value=current.finishedAt||'';card.querySelector('#am-next').value=current.nextTime||'';
  card.querySelector('#am-save-handoff').onclick=async()=>{await saveHandoff(ctx,{startWith:card.querySelector('#am-start').value.trim(),finishedAt:card.querySelector('#am-finish').value.trim(),nextTime:card.querySelector('#am-next').value.trim()});alert('授業引き継ぎを保存しました。')};
 }
 function escapeHtml(v){const d=document.createElement('div');d.textContent=v??'';return d.innerHTML}
