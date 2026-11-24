@@ -102,33 +102,43 @@ function choose(title,items,label=x=>String(x)){
  })
 }
 function lessonContext(state){
- const sheet=document.querySelector('.sheet'); if(!sheet)return null;
+ const sheet=document.querySelector('.sheet');if(!sheet)return null;
  const title=sheet.querySelector('.sheet-head h2')?.textContent?.trim()||'';
  const sub=sheet.querySelector('.sheet-head p')?.textContent?.trim()||'';
- const cls=classInfo(state,title); if(!cls)return null;
- const date=(sub.match(/\d{4}-\d{2}-\d{2}/)||[])[0]||today();
- return {classId:cls.id,className:cls.name,schoolId:cls.schoolId||null,date,lessonLabel:sub,lessonId:[cls.schoolId||'',cls.id,date,sub].join('|')};
+ const m=sub.match(/^(\d{4}-\d{2}-\d{2})\s*・\s*(\d+)限\s*・\s*(.+)$/);if(!m)return null;
+ const school=(state.schools||[]).filter(x=>x.name===m[3].trim());
+ if(school.length!==1)return null;
+ const classes=(state.classes||[]).filter(c=>c.name===title&&c.schoolId===school[0].id);
+ if(classes.length!==1)return null;
+ const cls=classes[0],date=m[1],period=Number(m[2]);
+ return {classId:cls.id,className:cls.name,schoolId:cls.schoolId,date,period,lessonLabel:sub,lessonId:[cls.schoolId||'',cls.id,date,sub].join('|')};
 }
+function handoffPeriod(r){return Number(r.period||String(r.lessonLabel||'').match(/・\s*(\d+)限/)?.[1]||0)}
+function sameSlot(a,b){return a.classId===b.classId&&a.schoolId===b.schoolId&&a.date===b.date&&handoffPeriod(a)===handoffPeriod(b)}
+function handoffFor(state,ctx){return (state.lessonHandoffs||[]).filter(x=>sameSlot(x,ctx)||x.lessonId===ctx.lessonId).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')))[0]||null}
 function previousHandoff(state,ctx){
- const list=(state.lessonHandoffs||[]).filter(x=>x.classId===ctx.classId&&x.schoolId===ctx.schoolId&&x.date<ctx.date).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
- return list[0]||null;
+ const prior=x=>x.classId===ctx.classId&&x.schoolId===ctx.schoolId&&(x.date<ctx.date||(x.date===ctx.date&&handoffPeriod(x)<ctx.period))&&handoffPeriod(x)>0;
+ const lessons=(state.lessons||[]).filter(x=>prior(x)&&x.executionStatus==='COMPLETED'&&x.lessonType!=='exam'&&x.source!=='EXAM');
+ const notes=(state.lessonHandoffs||[]).filter(x=>prior(x)&&!(state.lessons||[]).some(l=>sameSlot(l,x)&&(l.executionStatus==='CANCELLED'||l.lessonType==='exam'||l.source==='EXAM')));
+ const prev=[...lessons,...notes].sort((a,b)=>String(b.date).localeCompare(String(a.date))||handoffPeriod(b)-handoffPeriod(a))[0];
+ return prev?{...prev,...(handoffFor(state,prev)||{}),period:handoffPeriod(prev)}:null;
 }
 function handoffSeed(state,ctx,prev,current){
  // Only this lesson's saved entry may prefill the current lesson.
  // Previous plans are reference information, never automatic input.
  return {text:current&&Object.prototype.hasOwnProperty.call(current,'startWith')?(current.startWith||''):'',carried:false};
 }
-async function saveHandoff(ctx,patch){await updateState(s=>{s.lessonHandoffs=Array.isArray(s.lessonHandoffs)?s.lessonHandoffs:[];let r=s.lessonHandoffs.find(x=>x.lessonId===ctx.lessonId);if(!r){r={...ctx,id:uid(),createdAt:new Date().toISOString()};s.lessonHandoffs.push(r)}Object.assign(r,patch,{updatedAt:new Date().toISOString()})})}
+async function saveHandoff(ctx,patch){await updateState(s=>{s.lessonHandoffs=Array.isArray(s.lessonHandoffs)?s.lessonHandoffs:[];let r=handoffFor(s,ctx);if(!r){r={...ctx,id:uid(),createdAt:new Date().toISOString()};s.lessonHandoffs.push(r)}Object.assign(r,ctx,patch,{updatedAt:new Date().toISOString()})})}
 async function addLessonHandoff(){
  let state;try{state=await readState()}catch{return}
- const ctx=lessonContext(state);if(!ctx||document.getElementById('am-handoff'))return;
- const prev=previousHandoff(state,ctx), current=(state.lessonHandoffs||[]).find(x=>x.lessonId===ctx.lessonId)||{};
- const sheet=document.querySelector('.sheet');const card=document.createElement('section');card.id='am-handoff';card.className='am-handoff';
+ const ctx=lessonContext(state);const existing=document.getElementById('am-handoff');if(!ctx){existing?.remove();return}if(existing?.dataset.lessonId===ctx.lessonId)return;existing?.remove();
+ const prev=previousHandoff(state,ctx), current=handoffFor(state,ctx)||{};
+ const sheet=document.querySelector('.sheet');const card=document.createElement('section');card.id='am-handoff';card.dataset.lessonId=ctx.lessonId;card.className='am-handoff';
  const prevText=prev?.finishedAt?.trim()||'前回無記入', seed=handoffSeed(state,ctx,prev,current);
- card.innerHTML='<strong>授業引き継ぎ</strong><div class="am-prev">前回終了：'+escapeHtml(prevText)+'</div>'+(prev?.nextTime?'<div class="am-prev">前回の次回予定：'+escapeHtml(prev.nextTime)+'</div>':'')+(prev?.nextTime?'<button type="button" id="am-copy-prev" class="am-copy-prev">前回の次回予定をコピー</button>':'')+'<label>今日やり始めること<textarea id="am-start"></textarea></label><label>今日終了したところ<textarea id="am-finish"></textarea></label><label>次の時間にやりたいこと<textarea id="am-next"></textarea></label><button type="button" id="am-save-handoff">保存</button>';
+ card.innerHTML='<strong>授業引き継ぎ</strong><small>引き継ぎ修正版 11/24 ・ '+(prev?escapeHtml(prev.date+' '+prev.period+'限'):'前回授業なし')+'</small><div class="am-prev">前回終了：'+escapeHtml(prevText)+'</div>'+(prev?.nextTime?'<div class="am-prev">前回の次回予定：'+escapeHtml(prev.nextTime)+'</div>':'')+(prev?.nextTime?'<button type="button" id="am-copy-prev" class="am-copy-prev">前回の次回予定をコピー</button>':'')+'<label>今日やり始めること<textarea id="am-start"></textarea></label><label>今日終了したところ<textarea id="am-finish"></textarea></label><label>次の時間にやりたいこと<textarea id="am-next"></textarea></label><button type="button" id="am-save-handoff">保存</button>';
  sheet.insertBefore(card,sheet.firstChild);
  card.querySelector('#am-start').value=seed.text;const copyBtn=card.querySelector('#am-copy-prev');if(copyBtn)copyBtn.onclick=()=>{const field=card.querySelector('#am-start');if(field.value.trim()&&!confirm('現在の「今日やり始めること」を前回予定で置き換えますか？'))return;field.value=prev.nextTime||'';field.focus()};card.querySelector('#am-finish').value=current.finishedAt||'';card.querySelector('#am-next').value=current.nextTime||'';
- card.querySelector('#am-save-handoff').onclick=async()=>{await saveHandoff(ctx,{startWith:card.querySelector('#am-start').value.trim(),finishedAt:card.querySelector('#am-finish').value.trim(),nextTime:card.querySelector('#am-next').value.trim()});alert('授業引き継ぎを保存しました。')};
+ card.querySelector('#am-save-handoff').onclick=async()=>{try{await saveHandoff(ctx,{startWith:card.querySelector('#am-start').value.trim(),finishedAt:card.querySelector('#am-finish').value.trim(),nextTime:card.querySelector('#am-next').value.trim()});alert('授業引き継ぎを保存しました。')}catch(e){alert('保存できませんでした：'+e.message)}};
 }
 function escapeHtml(v){const d=document.createElement('div');d.textContent=v??'';return d.innerHTML}
 async function quickGuidance(){let state;try{state=await readState()}catch(e){alert(e.message);return}const classes=(state.classes||[]).filter(c=>c&&c.id);if(!classes.length){alert('登録クラスがありません。');return}const cls=await choose('クラスを選択',classes,c=>c.name||c.id);if(!cls)return;const nums=classNumbers(state,cls);if(!nums.length){alert('選択できる出席番号がありません。');return}const studentNumber=await choose('出席番号を選択',nums);if(studentNumber==null)return;const scene=prompt('場面（休み時間／昼休み／放課後／その他）','休み時間');if(scene===null)return;await addRecord({classId:cls.id,className:cls.name||'',schoolId:cls.schoolId||null,studentNumber,date:today(),scene},'GUIDANCE')}
